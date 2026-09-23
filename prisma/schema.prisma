@@ -38,6 +38,9 @@ model Claim {
   proofHash String @unique
 
   status      String @default("ELIGIBLE") // ELIGIBLE | PAYING | PAID | REVIEW
+  // Which tier this payout was priced from, e.g. "ChatGPT Pro". Kept so a
+  // payout amount can always be explained after the fact.
+  planLabel   String?
   amountCents Int
   txHash      String?
   failure     String?

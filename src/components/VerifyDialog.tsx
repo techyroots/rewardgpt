@@ -255,8 +255,9 @@ export function VerifyDialog({
         </div>
 
         <p className="mt-6 border-t border-line pt-4 text-xs leading-relaxed text-muted-soft">
-          RewardGPT never receives your credentials. We store an anonymous hash of your
-          subscription so it can only claim once — not your account details.
+          Your password and session never leave your device. The account identifier in
+          your proof is hashed on arrival and never stored, so a subscription can only
+          claim once.
         </p>
       </div>
     </div>

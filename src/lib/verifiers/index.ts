@@ -14,4 +14,4 @@ export function getVerifier(): SubscriptionVerifier {
 }
 
 export * from "./types";
-export { isPaidPlan } from "./plans";
+export { isPaidPlan, resolvePlanTier, type PlanTier } from "./plans";

@@ -1,11 +1,15 @@
 const FAQS = [
   {
     q: "Do I have to give you my ChatGPT login?",
-    a: "No. You sign in on the real chatgpt.com, claude.ai or grok.com in your own browser. The proof is generated on your device and only reveals which plan is active. Your email, password and session never reach us.",
+    a: "No. You sign in on the real chatgpt.com, claude.ai or grok.com in your own browser. The proof is generated on your own device, and your password and session never leave it.",
   },
   {
     q: "What do you actually store?",
-    a: "Your wallet address, which service you verified, the amount paid, and an anonymous hash of your subscription. The account identifier used to build that hash is discarded in the same request — it is never written to our database or logs.",
+    a: "Your wallet address, which service you verified, which plan tier it was, the amount paid, and an anonymous hash of your subscription. Nothing else.",
+  },
+  {
+    q: "Does my email reach your server?",
+    a: "Briefly, yes — and we would rather be straight about it. The ChatGPT proof identifies your account by email address. It arrives inside the proof, is immediately turned into an irreversible hash, and the address itself is never written to our database or our logs. It is what stops one subscription claiming twice. We cannot read it back, but it does pass through our server, so this is not zero-knowledge from our side.",
   },
   {
     q: "Can I claim from several wallets?",

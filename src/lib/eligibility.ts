@@ -3,7 +3,7 @@ import { prisma } from "./db";
 import { env } from "./env";
 import { deriveNullifier } from "./nullifier";
 import { cashbackCents, type ServiceId } from "./services";
-import { isPaidPlan, type VerifiedSubscription } from "./verifiers";
+import { resolvePlanTier, type VerifiedSubscription } from "./verifiers";
 
 export class IneligibleError extends Error {
   constructor(message: string) {
@@ -45,7 +45,8 @@ export async function recordEligibility(
     throw new IneligibleError("This proof is timestamped in the future.");
   }
 
-  if (!isPaidPlan(serviceId, proof.plan, proof.status)) {
+  const tier = resolvePlanTier(serviceId, proof.plan, proof.status);
+  if (!tier) {
     throw new IneligibleError(
       "We could not find an active paid subscription on that account.",
     );
@@ -58,7 +59,8 @@ export async function recordEligibility(
 
   await assertCooldownElapsed(session.wallet, serviceId);
 
-  const amountCents = cashbackCents(service.priceUsdCents, service.cashbackBps);
+  // Priced from the tier the user is actually on, not a per-service average.
+  const amountCents = cashbackCents(tier.priceUsdCents, service.cashbackBps);
   if (amountCents <= 0) {
     throw new IneligibleError("Cashback for that service is currently zero.");
   }
@@ -74,6 +76,7 @@ export async function recordEligibility(
         serviceId,
         nullifier,
         proofHash: proof.proofHash,
+        planLabel: tier.label,
         amountCents,
         status: "ELIGIBLE",
       },
