@@ -21,7 +21,10 @@ export type PlanTier = {
 export const PLAN_TIERS: Record<ServiceId, PlanTier[]> = {
   chatgpt: [
     // Order matters: the most specific pattern must come first.
-    { match: /prolite/i, label: "ChatGPT Pro", priceUsdCents: 20000 },
+    // "prolite" is what the API reports for a $100/mo subscription (confirmed
+    // against a real invoice). It is not the $200 Pro tier below, despite the
+    // name, so it needs its own entry or we would pay double.
+    { match: /prolite/i, label: "ChatGPT Pro Lite", priceUsdCents: 10000 },
     { match: /chatgpt\s*-?_?pro\b|^pro$/i, label: "ChatGPT Pro", priceUsdCents: 20000 },
     { match: /chatgpt\s*-?_?team/i, label: "ChatGPT Team", priceUsdCents: 2500 },
     { match: /chatgpt\s*-?_?plus|^plus$/i, label: "ChatGPT Plus", priceUsdCents: 2000 },
