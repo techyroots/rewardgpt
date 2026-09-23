@@ -1,12 +1,14 @@
 // End-to-end check of the eligibility rules against a running dev server.
-// Usage: npm run dev, then `node scripts/smoke-test.mjs`.
+// Usage: start a dev server with VERIFIER_MODE=mock, then run this against it.
+//   VERIFIER_MODE=mock PORT=3001 npm run dev
+//   BASE=http://localhost:3001 node scripts/smoke-test.mjs
 // It clears the claims table, so only point it at a local database.
 
 import { PrismaClient } from "@prisma/client";
 import { randomUUID } from "node:crypto";
 
 const prisma = new PrismaClient();
-const BASE = "http://localhost:3000";
+const BASE = process.env.BASE ?? "http://localhost:3000";
 let pass = 0, fail = 0;
 
 function check(name, ok, detail = "") {
@@ -35,21 +37,21 @@ async function submit(sessionId, accountId, plan, serviceId = "chatgpt") {
 await prisma.claim.deleteMany();
 await prisma.verificationSession.deleteMany();
 
-const walletA = "0x1111111111111111111111111111111111111111";
-const walletB = "0x2222222222222222222222222222222222222222";
+const walletA = "AJfbyBhT4bpvwGxVxbPTYF3CNWdYbLNqiLd75SSCHmgW";
+const walletB = "5SwJ3RDus6dm5EMzbr3KEy2EzmDJQjx4xP3HeZz7dLWj";
 
 console.log("\n1. A paid subscription becomes eligible");
-let r = await submit(await session(walletA), "acct_alice", "chatgpt-plus");
+let r = await submit(await session(walletA), "acct_alice", "prolite");
 check("claim created", r.status === 200 && !!r.body.claimId, JSON.stringify(r.body));
-check("cashback is $1.00 on a $20 plan", r.body.amountCents === 100, `got ${r.body.amountCents}`);
+check("cashback is $5.00 on the $100 prolite plan", r.body.amountCents === 500, `got ${r.body.amountCents}`);
 
 console.log("\n2. The same subscription cannot claim from a second wallet");
-r = await submit(await session(walletB), "acct_alice", "chatgpt-plus");
+r = await submit(await session(walletB), "acct_alice", "prolite");
 check("second wallet rejected", r.status === 409, JSON.stringify(r.body));
 check("reason mentions already claimed", /already claimed/i.test(r.body.error ?? ""), r.body.error);
 
 console.log("\n3. Nullifier ignores casing and whitespace");
-r = await submit(await session(walletB), "  ACCT_ALICE ", "chatgpt-plus");
+r = await submit(await session(walletB), "  ACCT_ALICE ", "prolite");
 check("normalised duplicate rejected", r.status === 409, JSON.stringify(r.body));
 
 console.log("\n4. A free account is not eligible");
@@ -62,12 +64,12 @@ check("cancelled plan rejected", r.status === 409, JSON.stringify(r.body));
 
 console.log("\n6. A session can only be used once");
 const reused = await session(walletB);
-await submit(reused, "acct_dave", "chatgpt-plus");
-r = await submit(reused, "acct_erin", "chatgpt-plus");
+await submit(reused, "acct_dave", "prolite");
+r = await submit(reused, "acct_erin", "prolite");
 check("session replay rejected", r.status === 409, JSON.stringify(r.body));
 
 console.log("\n7. Cooldown blocks a second claim from the same wallet");
-r = await submit(await session(walletB), "acct_frank", "chatgpt-plus");
+r = await submit(await session(walletB), "acct_frank", "prolite");
 check("cooldown enforced", r.status === 409 && /next claim available/i.test(r.body.error ?? ""), r.body.error);
 
 console.log("\n8. Claude and Grok are separate subscriptions");
