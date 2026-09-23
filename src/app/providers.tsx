@@ -18,9 +18,10 @@ export function Providers({ children }: { children: ReactNode }) {
     <PrivyProvider
       appId={appId}
       config={{
-        // External wallets and social logins side by side: someone with no
-        // wallet at all can still receive cashback into an embedded one.
-        loginMethods: ["wallet", "email", "google", "twitter"],
+        // Only the methods actually enabled on the Privy dashboard. Listing a
+        // disabled provider (google, twitter) just renders a button that
+        // fails, so enable it there first, then add it here.
+        loginMethods: ["wallet", "email"],
         embeddedWallets: { ethereum: { createOnLogin: "users-without-wallets" } },
         defaultChain: chain,
         supportedChains: [chain],

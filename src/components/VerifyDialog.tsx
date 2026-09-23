@@ -1,6 +1,6 @@
 "use client";
 
-import { usePrivy } from "@privy-io/react-auth";
+import { useCreateWallet, usePrivy } from "@privy-io/react-auth";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useApi } from "@/lib/client-api";
 import { formatUsd, getServiceDefinition, type ServiceId } from "@/lib/services";
@@ -32,6 +32,7 @@ export function VerifyDialog({
   onClose: () => void;
 }) {
   const { authenticated, login } = usePrivy();
+  const { createWallet } = useCreateWallet();
   const wallet = usePayoutWallet();
   const api = useApi();
 
@@ -155,11 +156,27 @@ export function VerifyDialog({
         </div>
 
         <div className="mt-5">
-          {stage === "connect" && (
+          {stage === "connect" && !authenticated && (
             <Body
               title="Connect a wallet first"
               text="Your cashback is sent straight to it. You can use an existing wallet or have one created for you."
               action={{ label: "Connect Wallet", onClick: () => login() }}
+            />
+          )}
+
+          {/* Signed in by email but with no wallet yet — which is what happens
+              when embedded wallets are not created automatically. Without this
+              there is nowhere to send the cashback and no way forward. */}
+          {stage === "connect" && authenticated && !wallet && (
+            <Body
+              title="You need a wallet to get paid"
+              text="Create one in a tap, or connect a wallet you already have."
+              action={{
+                label: "Create a wallet",
+                onClick: () => {
+                  createWallet().catch(() => setError("Could not create a wallet."));
+                },
+              }}
             />
           )}
 
