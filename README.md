@@ -14,10 +14,19 @@ Requires Node 22 (`.nvmrc` pins it — run `nvm use`).
 ```bash
 npm install
 cp .env.example .env      # then fill in the values below
-npm run db:push           # create the SQLite schema
+
+# Postgres, matching production. A container is the quickest way to get one:
+docker run -d --name rewardgpt-pg -p 5433:5432 \
+  -e POSTGRES_USER=rewardgpt -e POSTGRES_PASSWORD=rewardgpt -e POSTGRES_DB=rewardgpt \
+  postgres:16-alpine
+# DATABASE_URL="postgresql://rewardgpt:rewardgpt@localhost:5433/rewardgpt?schema=public"
+
+npm run db:push           # create the schema
 npm run db:seed           # load the service catalog
 npm run dev
 ```
+
+To deploy, see [DEPLOY.md](DEPLOY.md).
 
 The minimum to see the full flow is `NEXT_PUBLIC_PRIVY_APP_ID` and
 `PRIVY_APP_SECRET` from [dashboard.privy.io](https://dashboard.privy.io). With
@@ -108,7 +117,7 @@ fixed, so it is worth alerting on callback failure rates.
 
 ## Going to production
 
-1. Switch `datasource db` in `prisma/schema.prisma` to `postgresql` and point `DATABASE_URL` at it.
+1. Point `DATABASE_URL` at a managed Postgres (Neon and Vercel Postgres both have free tiers).
 2. Set `SOLANA_CLUSTER=mainnet-beta`, point `SOLANA_RPC_URL` at a paid RPC provider (the public endpoint is rate limited), and fund the treasury with SOL.
 3. Move `TREASURY_SECRET_KEY` into a secrets manager. It is a hot wallet — keep only the float you need in it.
 4. Set `VERIFIER_MODE=reclaim`. The mock verifier refuses to start in production.

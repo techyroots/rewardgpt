@@ -10,7 +10,11 @@ generator client {
 }
 
 datasource db {
-  provider = "sqlite"
+  // Postgres rather than SQLite: the app is deployed to serverless functions
+  // with an ephemeral filesystem, so a file-backed database would be wiped on
+  // every cold start and would not be shared between concurrent invocations —
+  // which would defeat the unique nullifier that stops double claims.
+  provider = "postgresql"
   url      = env("DATABASE_URL")
 }
 
