@@ -151,7 +151,7 @@ export function VerifyDialog({
         if (event.target === event.currentTarget) onClose();
       }}
     >
-      <div className="rise w-full max-w-md rounded-2xl border border-line bg-surface p-6 card-float">
+      <div className="dialog-in w-full max-w-md rounded-2xl border border-line bg-surface p-6 card-float">
         <div className="flex items-start gap-3">
           <Mark className="size-10 shrink-0" />
           <div className="min-w-0 flex-1">
@@ -171,7 +171,9 @@ export function VerifyDialog({
           </button>
         </div>
 
-        <div className="mt-5">
+        <Stepper stage={stage} />
+
+        <div key={stage} className="step-in mt-5">
           {stage === "connect" && !authenticated && (
             <Body
               title="Connect a wallet first"
@@ -243,6 +245,10 @@ export function VerifyDialog({
           {stage === "claiming" && <Body title="Sending…" text="Your cashback is on its way. This takes a few seconds." />}
 
           {stage === "paid" && claim && (
+            <SuccessTick />
+          )}
+
+          {stage === "paid" && claim && (
             <Body
               title="Cashback sent"
               text={`${claim.solAmount ? `${claim.solAmount} SOL` : formatUsd(claim.amountCents)} is on its way to your wallet.`}
@@ -302,11 +308,60 @@ function Body({
       {action && (
         <button
           onClick={action.onClick}
-          className="mt-5 w-full rounded-full bg-foreground px-5 py-3 text-sm font-medium text-white transition hover:bg-foreground/90"
+          className="press mt-5 w-full rounded-full bg-foreground px-5 py-3 text-sm font-medium text-white transition hover:bg-foreground/90"
         >
           {action.label}
         </button>
       )}
+    </div>
+  );
+}
+
+/** Where the user is in the three-step flow. */
+function Stepper({ stage }: { stage: Stage }) {
+  const current =
+    stage === "connect" ? 0 : stage === "paid" ? 2 : stage === "eligible" || stage === "claiming" ? 2 : 1;
+
+  return (
+    <ol className="mt-5 flex items-center gap-2" aria-label="Progress">
+      {["Connect", "Verify", "Claim"].map((label, index) => {
+        const done = index < current || stage === "paid";
+        const active = index === current && stage !== "paid";
+        return (
+          <li key={label} className="flex flex-1 items-center gap-2">
+            <span
+              className={`h-1 flex-1 rounded-full transition-colors duration-500 ${
+                done ? "bg-accent" : active ? "bg-foreground/35" : "bg-foreground/10"
+              }`}
+            />
+            <span
+              className={`text-[10.5px] font-medium tracking-wide uppercase transition-colors duration-500 ${
+                done ? "text-accent" : active ? "text-foreground" : "text-muted-soft"
+              }`}
+            >
+              {label}
+            </span>
+          </li>
+        );
+      })}
+    </ol>
+  );
+}
+
+function SuccessTick() {
+  return (
+    <div className="mb-4 flex justify-center">
+      <svg viewBox="0 0 48 48" className="size-12" fill="none" aria-hidden="true">
+        <circle cx="24" cy="24" r="22" className="tick-ring" fill="#ecfdf5" stroke="#10a37f" strokeWidth="1.5" />
+        <path
+          d="m15.5 24.5 6 6 11-12"
+          className="tick-path"
+          stroke="#10a37f"
+          strokeWidth="3"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+        />
+      </svg>
     </div>
   );
 }

@@ -18,23 +18,29 @@ export function Hero() {
             Get 5% cashback on AI subscriptions.
           </h1>
           <p className="mt-5 max-w-md text-[15px] leading-relaxed text-muted">
-            Verify your ChatGPT, Claude, or Grok subscription and receive cashback to your
-            wallet. No email, no password, no identity shared.
+            Prove your ChatGPT, Claude, or Grok subscription with zkTLS and get paid in
+            SOL. Your password and session never leave your device.
           </p>
 
           <div className="mt-8 flex flex-wrap items-center gap-3">
             <a
               href="#supported"
-              className="inline-flex items-center gap-2 rounded-full bg-foreground px-6 py-3 text-sm font-medium text-white transition hover:bg-foreground/90"
+              className="press group inline-flex items-center gap-2 rounded-full bg-foreground px-6 py-3 text-sm font-medium text-white transition hover:bg-foreground/90"
             >
               Get started
-              <svg viewBox="0 0 16 16" className="size-3.5" fill="none" stroke="currentColor" strokeWidth="1.8">
+              <svg
+                viewBox="0 0 16 16"
+                className="size-3.5 transition-transform duration-300 group-hover:translate-x-1"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="1.8"
+              >
                 <path d="M2.5 8h11M9 3.5 13.5 8 9 12.5" strokeLinecap="round" strokeLinejoin="round" />
               </svg>
             </a>
             <a
               href="#how-it-works"
-              className="rounded-full border border-line-strong bg-surface px-6 py-3 text-sm font-medium transition hover:bg-foreground/5"
+              className="press rounded-full border border-line-strong bg-surface px-6 py-3 text-sm font-medium transition hover:bg-foreground/5"
             >
               How it works
             </a>
@@ -65,15 +71,20 @@ function HeroArt() {
         {[ChatGptMark, ClaudeMark, GrokMark].map((Mark, index) => (
           <div
             key={index}
-            className="rounded-2xl border border-line bg-surface p-2 card-float"
-            style={{ transform: `translateX(${(2 - index) * 16}px)` }}
+            className="float-soft rounded-2xl border border-line bg-surface p-2 card-float"
+            style={{
+              // Each chip drifts slightly out of phase, so the group breathes
+              // rather than bobbing in lockstep.
+              marginLeft: `${(2 - index) * 16}px`,
+              animationDelay: `${index * 0.55}s`,
+            }}
           >
             <Mark className="size-8" />
           </div>
         ))}
       </div>
 
-      <div className="absolute top-1 left-0 w-[21.5rem] -rotate-3 overflow-hidden rounded-3xl border border-line bg-surface p-5 card-float">
+      <div className="sheen absolute top-1 left-0 w-[21.5rem] -rotate-3 overflow-hidden rounded-3xl border border-line bg-surface p-5 card-float">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
             <RewardGptMark className="size-5" />

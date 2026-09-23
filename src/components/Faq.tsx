@@ -1,3 +1,8 @@
+"use client";
+
+import { useState } from "react";
+import { Reveal } from "./Reveal";
+
 const FAQS = [
   {
     q: "Do I have to give you my ChatGPT login?",
@@ -30,17 +35,54 @@ const FAQS = [
 ];
 
 export function Faq() {
+  // Open by index rather than a boolean per row, so only one answer shows at a
+  // time and the section stays scannable.
+  const [open, setOpen] = useState<number | null>(0);
+
   return (
     <section id="faq" className="mx-auto max-w-6xl px-4 pb-20 sm:px-6">
-      <h2 className="text-[22px] font-semibold tracking-tight">Questions</h2>
-      <dl className="mt-6 max-w-3xl divide-y divide-line border-t border-line">
-        {FAQS.map((item) => (
-          <div key={item.q} className="py-5">
-            <dt className="text-[15px] font-medium">{item.q}</dt>
-            <dd className="mt-1.5 text-sm leading-relaxed text-muted">{item.a}</dd>
-          </div>
-        ))}
-      </dl>
+      <Reveal>
+        <h2 className="text-[22px] font-semibold tracking-tight">Questions</h2>
+      </Reveal>
+
+      <div className="mt-6 max-w-3xl divide-y divide-line border-t border-line">
+        {FAQS.map((item, index) => {
+          const expanded = open === index;
+          return (
+            <Reveal key={item.q} delay={Math.min(index, 4) * 60}>
+              <h3>
+                <button
+                  onClick={() => setOpen(expanded ? null : index)}
+                  aria-expanded={expanded}
+                  className="flex w-full items-center justify-between gap-4 py-4 text-left transition-colors hover:text-accent"
+                >
+                  <span className="text-[15px] font-medium">{item.q}</span>
+                  <svg
+                    viewBox="0 0 16 16"
+                    className={`size-4 shrink-0 text-muted-soft transition-transform duration-300 ${expanded ? "rotate-180" : ""}`}
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="1.6"
+                  >
+                    <path d="m3.5 6 4.5 4.5L12.5 6" strokeLinecap="round" strokeLinejoin="round" />
+                  </svg>
+                </button>
+              </h3>
+
+              {/* Grid-rows transition animates to the content's natural height,
+                  which a max-height hack only approximates. */}
+              <div
+                className="grid transition-[grid-template-rows] duration-300 ease-out"
+                style={{ gridTemplateRows: expanded ? "1fr" : "0fr" }}
+              >
+                <div className="overflow-hidden">
+                  <p className="pb-5 text-sm leading-relaxed text-muted">{item.a}</p>
+                </div>
+              </div>
+            </Reveal>
+          );
+        })}
+      </div>
     </section>
   );
 }

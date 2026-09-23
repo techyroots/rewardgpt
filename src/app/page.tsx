@@ -1,3 +1,4 @@
+import { ClaimHistory } from "@/components/ClaimHistory";
 import { Faq } from "@/components/Faq";
 import { Header } from "@/components/Header";
 import { Hero } from "@/components/Hero";
@@ -15,6 +16,7 @@ export default function HomePage() {
       <main>
         <Hero />
         <ServiceSection />
+        <ClaimHistory />
         <HowItWorks />
         <StatsBar />
         <Faq />

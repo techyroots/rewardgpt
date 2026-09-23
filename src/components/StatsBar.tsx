@@ -1,6 +1,7 @@
 import { prisma } from "@/lib/db";
 import { treasuryLamports } from "@/lib/payout";
-import { formatUsd } from "@/lib/services";
+import { CountUp } from "./CountUp";
+import { Reveal } from "./Reveal";
 
 /**
  * Live numbers only.
@@ -23,29 +24,29 @@ export async function StatsBar() {
   const tiles = [
     lamports !== null && {
       label: "Treasury Balance",
-      value: `${(Number(lamports) / 1_000_000_000).toFixed(3)} SOL`,
+      value: <CountUp value={Number(lamports) / 1_000_000_000} decimals={3} suffix=" SOL" />,
       icon: <DatabaseIcon />,
     },
     {
       label: "Cashback Paid",
-      value: formatUsd(paid._sum.amountCents ?? 0),
+      value: <CountUp value={(paid._sum.amountCents ?? 0) / 100} decimals={2} prefix="$" />,
       icon: <GiftIcon />,
     },
     {
       label: "Verified Users",
-      value: distinctUsers.length.toLocaleString("en-US"),
+      value: <CountUp value={distinctUsers.length} />,
       icon: <PeopleIcon />,
     },
     {
       label: "Claims Today",
-      value: claimsToday.toLocaleString("en-US"),
+      value: <CountUp value={claimsToday} />,
       icon: <BoltIcon />,
     },
-  ].filter(Boolean) as { label: string; value: string; icon: React.ReactNode }[];
+  ].filter(Boolean) as { label: string; value: React.ReactNode; icon: React.ReactNode }[];
 
   return (
     <section className="mx-auto max-w-6xl px-4 pb-16 sm:px-6">
-      <div className="flex flex-wrap items-center gap-x-10 gap-y-6 rounded-2xl border border-line bg-surface px-6 py-5">
+      <Reveal className="flex flex-wrap items-center gap-x-10 gap-y-6 rounded-2xl border border-line bg-surface px-6 py-5">
         {tiles.map((tile) => (
           <div key={tile.label} className="flex items-center gap-3">
             <span className="text-muted-soft">{tile.icon}</span>
@@ -58,7 +59,7 @@ export async function StatsBar() {
         <p className="ml-auto max-w-[14rem] text-right text-[12px] leading-snug text-muted-soft">
           A more rewarding AI future, together.
         </p>
-      </div>
+      </Reveal>
     </section>
   );
 }

@@ -25,7 +25,7 @@ export const SERVICES: ServiceDefinition[] = [
     planLabel: "ChatGPT Plus",
     priceUsdCents: 2000,
     cashbackBps: 500,
-    blurb: "Get cashback on your ChatGPT Plus subscription.",
+    blurb: "Plus, Pro and Team plans all qualify.",
     accent: "#10a37f",
   },
   {
@@ -34,7 +34,7 @@ export const SERVICES: ServiceDefinition[] = [
     planLabel: "Claude Pro",
     priceUsdCents: 2000,
     cashbackBps: 500,
-    blurb: "Get cashback on your Claude subscription.",
+    blurb: "Pro and Max plans all qualify.",
     accent: "#d97757",
   },
   {
@@ -43,7 +43,7 @@ export const SERVICES: ServiceDefinition[] = [
     planLabel: "SuperGrok",
     priceUsdCents: 3000,
     cashbackBps: 500,
-    blurb: "Get cashback on your Grok subscription.",
+    blurb: "SuperGrok and Premium plans qualify.",
     accent: "#111111",
   },
 ];

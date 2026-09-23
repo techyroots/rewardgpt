@@ -47,7 +47,7 @@ export async function POST(request: Request) {
 export async function GET(request: Request) {
   try {
     const user = await authenticate(request);
-    const claims = await prisma.claim.findMany({
+    const rows = await prisma.claim.findMany({
       where: { privyUserId: user.privyUserId },
       orderBy: { createdAt: "desc" },
       select: {
@@ -62,6 +62,14 @@ export async function GET(request: Request) {
         createdAt: true,
       },
     });
+
+    // The explorer URL depends on the cluster, which only the server knows.
+    const claims = rows.map((row) => ({
+      ...row,
+      solAmount: row.lamports ? formatSol(BigInt(row.lamports)) : null,
+      explorerUrl: row.txHash ? explorerTxUrl(row.txHash) : null,
+    }));
+
     return NextResponse.json({ claims });
   } catch (error) {
     if (error instanceof AuthError) {

@@ -71,3 +71,133 @@ body {
     animation: none;
   }
 }
+
+/* ---------------------------------------------------------------------------
+ * Motion
+ *
+ * Everything here is opt-in per element and disabled wholesale under
+ * prefers-reduced-motion. The aim is for the page to feel responsive, not
+ * animated: this product moves money, and flashiness reads as untrustworthy.
+ * ------------------------------------------------------------------------- */
+
+/* Scroll reveal.
+ *
+ * The hidden state is gated behind [data-motion="on"], which a tiny inline
+ * script sets at the top of the document. Without JavaScript the attribute is
+ * never set, so nothing is ever hidden — content must not depend on scripts to
+ * be visible, for readers, crawlers and print alike. */
+[data-motion="on"] [data-reveal] {
+  opacity: 0;
+  transform: translateY(14px);
+  transition:
+    opacity 0.6s cubic-bezier(0.22, 1, 0.36, 1),
+    transform 0.6s cubic-bezier(0.22, 1, 0.36, 1);
+  transition-delay: var(--reveal-delay, 0ms);
+}
+
+[data-motion="on"] [data-reveal][data-revealed="true"] {
+  opacity: 1;
+  transform: none;
+}
+
+@keyframes float-soft {
+  0%, 100% { transform: translateY(0) rotate(var(--float-rot, 0deg)); }
+  50% { transform: translateY(-7px) rotate(var(--float-rot, 0deg)); }
+}
+
+.float-soft {
+  animation: float-soft 6s ease-in-out infinite;
+}
+
+@keyframes sheen {
+  0% { transform: translateX(-120%); }
+  100% { transform: translateX(220%); }
+}
+
+/* A single light sweep across the hero card, slow enough not to nag. */
+.sheen::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(105deg, transparent 38%, rgba(255, 255, 255, 0.55) 50%, transparent 62%);
+  animation: sheen 5.5s ease-in-out 1.2s infinite;
+  pointer-events: none;
+}
+
+@keyframes dialog-in {
+  from { opacity: 0; transform: translateY(12px) scale(0.985); }
+  to { opacity: 1; transform: none; }
+}
+
+.dialog-in {
+  animation: dialog-in 0.28s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+@keyframes step-in {
+  from { opacity: 0; transform: translateX(8px); }
+  to { opacity: 1; transform: none; }
+}
+
+.step-in {
+  animation: step-in 0.3s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+/* Success tick, drawn rather than popped. */
+@keyframes draw-check {
+  to { stroke-dashoffset: 0; }
+}
+
+@keyframes ring-pop {
+  0% { transform: scale(0.7); opacity: 0; }
+  60% { transform: scale(1.06); opacity: 1; }
+  100% { transform: scale(1); opacity: 1; }
+}
+
+.tick-ring { animation: ring-pop 0.42s cubic-bezier(0.22, 1, 0.36, 1) both; }
+
+.tick-path {
+  stroke-dasharray: 26;
+  stroke-dashoffset: 26;
+  animation: draw-check 0.42s cubic-bezier(0.65, 0, 0.35, 1) 0.24s forwards;
+}
+
+/* Lift on hover, for anything clickable that is a surface rather than a button. */
+.lift {
+  transition:
+    transform 0.25s cubic-bezier(0.22, 1, 0.36, 1),
+    box-shadow 0.25s cubic-bezier(0.22, 1, 0.36, 1),
+    border-color 0.25s ease;
+}
+
+.lift:hover {
+  transform: translateY(-3px);
+  box-shadow:
+    0 1px 2px rgba(16, 16, 16, 0.04),
+    0 18px 38px -16px rgba(16, 16, 16, 0.2);
+}
+
+.press:active {
+  transform: scale(0.985);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  [data-motion="on"] [data-reveal],
+  [data-motion="on"] [data-reveal][data-revealed="true"] {
+    opacity: 1;
+    transform: none;
+    transition: none;
+  }
+
+  .float-soft,
+  .sheen::after,
+  .dialog-in,
+  .step-in,
+  .tick-ring,
+  .tick-path {
+    animation: none;
+  }
+
+  .tick-path { stroke-dashoffset: 0; }
+
+  .lift:hover { transform: none; }
+}
