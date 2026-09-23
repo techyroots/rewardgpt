@@ -18,6 +18,19 @@ import { VerificationError, type SubscriptionVerifier, type VerificationStart, t
  * uses something unexpected.
  */
 
+/**
+ * The domain each service's proof must actually be about.
+ *
+ * Content validation below is not done through the SDK's hash list (see
+ * `verify`), so this is part of what replaces it: a proof whose request went
+ * somewhere other than the service's own domain is refused.
+ */
+const EXPECTED_HOSTS: Record<ServiceId, string[]> = {
+  chatgpt: ["chatgpt.com", "chat.openai.com", "openai.com"],
+  claude: ["claude.ai", "anthropic.com"],
+  grok: ["grok.com", "x.com"],
+};
+
 /** Checked in order; first non-empty match wins. */
 const ACCOUNT_ID_ALIASES = [
   "accountId", "account_id", "userId", "user_id", "uid", "id", "sub", "email",
@@ -110,21 +123,55 @@ export class ReclaimVerifier implements SubscriptionVerifier {
   async verify(serviceId: ServiceId, payload: unknown): Promise<VerifiedSubscription> {
     const proof = normalizeProof(payload);
 
-    const result = await verifyProof(proof, {
-      providerId: env.reclaimProviderId(serviceId),
-    });
+    // Step 1: the cryptography. This confirms real Reclaim attestors signed
+    // this claim, which is the part that cannot be forged.
+    //
+    // Content validation is disabled here deliberately. It compares the
+    // proof's provider hash against the list published for the provider
+    // version — and catalog providers routinely publish none (this one returns
+    // an empty list), so enabling it rejects every valid proof. Steps 2-4
+    // below re-impose that binding ourselves instead of trusting blindly.
+    const result = await verifyProof(proof, { dangerouslyDisableContentValidation: true });
     if (!result.isVerified) {
       throw new VerificationError(
         `Proof failed attestor verification: ${result.error?.message ?? "unknown reason"}`,
       );
     }
 
-    const trusted = result.data[0];
-    if (!trusted) {
-      throw new VerificationError("Proof carried no verified data.");
+    // The context is covered by the claim identifier the attestors signed, so
+    // anything read out of it is as trustworthy as the signature itself.
+    const context = parseContext(proof);
+
+    // Step 2: the proof must come from the provider we asked for. Pinning the
+    // hash is what stops a proof generated against some other, weaker provider
+    // from being passed off as this one.
+    const pinnedHash = process.env[`RECLAIM_PROVIDER_HASH_${serviceId.toUpperCase()}`];
+    if (pinnedHash) {
+      if (context.providerHash?.toLowerCase() !== pinnedHash.toLowerCase()) {
+        throw new VerificationError("This proof was produced by a different provider.");
+      }
+    } else if (process.env.NODE_ENV === "production") {
+      throw new VerificationError(
+        `Refusing to accept proofs for ${serviceId} without RECLAIM_PROVIDER_HASH_${serviceId.toUpperCase()} pinned.`,
+      );
+    } else {
+      console.warn(
+        `[reclaim] ${serviceId}: no pinned provider hash. Observed ${context.providerHash}. Set RECLAIM_PROVIDER_HASH_${serviceId.toUpperCase()} to lock it.`,
+      );
     }
 
-    const params = (trusted.extractedParameters ?? {}) as Record<string, string>;
+    // Step 3: the request must have gone to the service's own domain.
+    assertExpectedHost(serviceId, proof);
+
+    // Step 4: the proof must belong to our Reclaim application.
+    const appId = context.attestationNonceData?.applicationId;
+    if (appId && appId.toLowerCase() !== env.reclaimAppId.toLowerCase()) {
+      throw new VerificationError("This proof was issued for a different application.");
+    }
+
+    const params = (context.extractedParameters ??
+      result.data[0]?.extractedParameters ??
+      {}) as Record<string, string>;
 
     const accountId = pick(params, ACCOUNT_ID_ALIASES, process.env.RECLAIM_PARAM_ACCOUNT_ID);
     const plan = pick(params, PLAN_ALIASES, process.env.RECLAIM_PARAM_PLAN);
@@ -145,9 +192,7 @@ export class ReclaimVerifier implements SubscriptionVerifier {
       `[reclaim] ${serviceId}: resolved plan from provider keys [${Object.keys(params).join(", ")}]`,
     );
 
-    const sessionId = String(
-      (trusted.context as { reclaimSessionId?: unknown })?.reclaimSessionId ?? "",
-    );
+    const sessionId = String(context.reclaimSessionId ?? "");
     if (!sessionId) {
       throw new VerificationError("Proof carried no Reclaim session id.");
     }
@@ -162,6 +207,44 @@ export class ReclaimVerifier implements SubscriptionVerifier {
       // The claim identifier is unique per proof, which makes it a sound replay guard.
       proofHash: proof.identifier,
     };
+  }
+}
+
+type ProofContext = {
+  reclaimSessionId?: string;
+  providerHash?: string;
+  extractedParameters?: Record<string, string>;
+  attestationNonceData?: { applicationId?: string };
+};
+
+/** The signed context, which carries the revealed values and the provider hash. */
+function parseContext(proof: Proof): ProofContext {
+  const raw = proof.claimData.context;
+  if (!raw) return {};
+  try {
+    return (typeof raw === "string" ? JSON.parse(raw) : raw) as ProofContext;
+  } catch {
+    throw new VerificationError("Proof context could not be read.");
+  }
+}
+
+/** Refuses a proof whose underlying request did not target the service. */
+function assertExpectedHost(serviceId: ServiceId, proof: Proof): void {
+  let url: string | undefined;
+  try {
+    const params = JSON.parse(String(proof.claimData.parameters ?? "{}")) as { url?: string };
+    url = params.url;
+  } catch {
+    throw new VerificationError("Proof parameters could not be read.");
+  }
+  if (!url) throw new VerificationError("Proof does not say which URL it covers.");
+
+  const host = new URL(url).hostname.toLowerCase().replace(/^www\./, "");
+  const allowed = EXPECTED_HOSTS[serviceId];
+  if (!allowed.some((domain) => host === domain || host.endsWith(`.${domain}`))) {
+    throw new VerificationError(
+      `This proof is about ${host}, not ${serviceId}.`,
+    );
   }
 }
 
