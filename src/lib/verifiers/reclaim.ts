@@ -55,11 +55,23 @@ export class ReclaimVerifier implements SubscriptionVerifier {
       env.reclaimProviderId(serviceId),
     );
 
-    // Reclaim posts the finished proof straight to our backend, so the browser
-    // never handles it and can't tamper with it in transit.
-    const callback = new URL("/api/verify/callback", env.appUrl);
-    callback.searchParams.set("service", serviceId);
-    proofRequest.setAppCallbackUrl(callback.toString(), true);
+    // Setting a callback URL tells Reclaim to deliver the proof there *instead*
+    // of storing it on the session. That is what we want in production, where
+    // the browser then never handles the proof and cannot tamper with it.
+    //
+    // But if the URL is not reachable from the internet — localhost in
+    // development — delivery fails, the user sees "Proof submission failed",
+    // and the proof is lost even though it generated correctly. In that case
+    // we leave the default in place and collect the proof by polling instead.
+    if (isPubliclyReachable(env.appUrl)) {
+      const callback = new URL("/api/verify/callback", env.appUrl);
+      callback.searchParams.set("service", serviceId);
+      proofRequest.setAppCallbackUrl(callback.toString(), true);
+    } else {
+      console.info(
+        `[reclaim] ${env.appUrl} is not reachable from the internet; collecting proofs by polling instead of callback.`,
+      );
+    }
 
     return {
       sessionId: proofRequest.getSessionId(),
@@ -151,6 +163,29 @@ export class ReclaimVerifier implements SubscriptionVerifier {
       proofHash: proof.identifier,
     };
   }
+}
+
+/**
+ * Whether Reclaim's servers could POST to this URL.
+ *
+ * Loopback and private-range addresses cannot receive a callback from the
+ * outside world, so asking Reclaim to use one silently throws the proof away.
+ */
+function isPubliclyReachable(appUrl: string): boolean {
+  let host: string;
+  try {
+    host = new URL(appUrl).hostname.toLowerCase();
+  } catch {
+    return false;
+  }
+
+  if (host === "localhost" || host.endsWith(".localhost") || host.endsWith(".local")) return false;
+  if (host === "127.0.0.1" || host === "::1" || host === "0.0.0.0") return false;
+  // RFC1918 and link-local ranges.
+  if (/^10\./.test(host) || /^192\.168\./.test(host) || /^169\.254\./.test(host)) return false;
+  if (/^172\.(1[6-9]|2\d|3[01])\./.test(host)) return false;
+
+  return true;
 }
 
 /** Reclaim's callback delivers the proof as JSON, sometimes string-encoded. */
