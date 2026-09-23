@@ -201,3 +201,44 @@ body {
 
   .lift:hover { transform: none; }
 }
+
+/* Brief attention pull on the section the hero button sends you to. */
+@keyframes highlight-pulse {
+  0% { box-shadow: 0 0 0 0 rgba(16, 163, 127, 0); }
+  25% { box-shadow: 0 0 0 10px rgba(16, 163, 127, 0.1); }
+  100% { box-shadow: 0 0 0 0 rgba(16, 163, 127, 0); }
+}
+
+[data-highlight="true"] .lift {
+  animation: highlight-pulse 1.3s ease-out;
+  border-color: var(--border-strong);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  [data-highlight="true"] .lift { animation: none; }
+}
+
+/* Slow-moving colour wash behind the hero art. Heavily blurred and low
+   opacity, so it reads as light rather than as shapes. */
+@keyframes aurora-drift {
+  0%, 100% { transform: translate3d(0, 0, 0) scale(1); }
+  33% { transform: translate3d(6%, -5%, 0) scale(1.12); }
+  66% { transform: translate3d(-5%, 4%, 0) scale(0.95); }
+}
+
+.aurora {
+  position: absolute;
+  inset: -12%;
+  pointer-events: none;
+  filter: blur(46px);
+  opacity: 0.72;
+  background:
+    radial-gradient(42% 46% at 24% 32%, rgba(16, 163, 127, 0.4), transparent 68%),
+    radial-gradient(38% 42% at 74% 26%, rgba(217, 119, 87, 0.34), transparent 68%),
+    radial-gradient(44% 40% at 58% 76%, rgba(120, 140, 255, 0.26), transparent 70%);
+  animation: aurora-drift 17s ease-in-out infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .aurora { animation: none; }
+}
