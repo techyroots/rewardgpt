@@ -24,42 +24,62 @@ export async function StatsBar() {
   const tiles = [
     lamports !== null && {
       label: "Treasury Balance",
+      hint: "available to pay out",
       value: <CountUp value={Number(lamports) / 1_000_000_000} decimals={3} suffix=" SOL" />,
       icon: <DatabaseIcon />,
     },
     {
       label: "Cashback Paid",
+      hint: "returned to members",
       value: <CountUp value={(paid._sum.amountCents ?? 0) / 100} decimals={2} prefix="$" />,
       icon: <GiftIcon />,
     },
     {
       label: "Verified Users",
+      hint: "subscriptions proven",
       value: <CountUp value={distinctUsers.length} />,
       icon: <PeopleIcon />,
     },
     {
       label: "Claims Today",
+      hint: "in the last 24 hours",
       value: <CountUp value={claimsToday} />,
       icon: <BoltIcon />,
     },
-  ].filter(Boolean) as { label: string; value: React.ReactNode; icon: React.ReactNode }[];
+  ].filter(Boolean) as {
+    label: string;
+    hint: string;
+    value: React.ReactNode;
+    icon: React.ReactNode;
+  }[];
 
   return (
     <section className="mx-auto max-w-6xl px-4 pb-16 sm:px-6">
-      <Reveal className="flex flex-wrap items-center gap-x-10 gap-y-6 rounded-2xl border border-line bg-surface px-6 py-5">
-        {tiles.map((tile) => (
-          <div key={tile.label} className="flex items-center gap-3">
-            <span className="text-muted-soft">{tile.icon}</span>
-            <span>
-              <span className="block text-[17px] font-semibold tracking-tight">{tile.value}</span>
-              <span className="block text-[12px] text-muted">{tile.label}</span>
-            </span>
-          </div>
-        ))}
-        <p className="ml-auto max-w-[14rem] text-right text-[12px] leading-snug text-muted-soft">
-          A more rewarding AI future, together.
-        </p>
+      <Reveal>
+        <div className="flex items-baseline justify-between gap-4">
+          <h2 className="text-[26px] font-semibold tracking-tight">By the numbers</h2>
+          <p className="text-[12.5px] text-muted-soft">Live from the treasury and the chain.</p>
+        </div>
       </Reveal>
+
+      {/* One tile per figure, rather than a single band where everything ran
+          together and the right half sat empty. */}
+      <div className="mt-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+        {tiles.map((tile, index) => (
+          <Reveal key={tile.label} delay={index * 90} className="h-full">
+            <div className="lift h-full rounded-2xl border border-line bg-surface p-5">
+              <span className="flex size-9 items-center justify-center rounded-xl bg-foreground/[0.04] text-muted">
+                {tile.icon}
+              </span>
+              <p className="mt-4 text-2xl font-semibold tracking-tight tabular-nums">
+                {tile.value}
+              </p>
+              <p className="mt-1 text-[13px] font-medium">{tile.label}</p>
+              <p className="mt-0.5 text-[12px] text-muted-soft">{tile.hint}</p>
+            </div>
+          </Reveal>
+        ))}
+      </div>
     </section>
   );
 }
