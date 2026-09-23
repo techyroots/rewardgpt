@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { authenticate, AuthError, requireOwnedWallet } from "@/lib/auth";
+import { authenticate, AuthError, resolvePayoutWallet } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import { isServiceId } from "@/lib/services";
 import { getVerifier } from "@/lib/verifiers";
@@ -10,12 +10,13 @@ export const runtime = "nodejs";
 export async function POST(request: Request) {
   try {
     const user = await authenticate(request);
-    const body = (await request.json()) as { serviceId?: string; wallet?: string };
+    const body = (await request.json()) as { serviceId?: string };
 
     if (!isServiceId(body.serviceId)) {
       return NextResponse.json({ error: "Unknown service." }, { status: 400 });
     }
-    const wallet = requireOwnedWallet(user, body.wallet ?? "");
+    // Any wallet in the request body is ignored on purpose.
+    const wallet = resolvePayoutWallet(user);
 
     const service = await prisma.service.findUnique({ where: { id: body.serviceId } });
     if (!service?.enabled) {
@@ -34,7 +35,8 @@ export async function POST(request: Request) {
       },
     });
 
-    return NextResponse.json(started);
+    // Returned so the UI can show which address will actually be paid.
+    return NextResponse.json({ ...started, wallet });
   } catch (error) {
     if (error instanceof AuthError) {
       return NextResponse.json({ error: error.message }, { status: 401 });

@@ -94,25 +94,21 @@ function walletsOf(user: { linkedAccounts: { type: string }[] }): string[] {
 }
 
 /**
- * Confirms the payout address is one the caller actually controls, so a claim
- * can't be pointed at someone else's wallet by editing the request body.
+ * Decides where a user's cashback is sent.
+ *
+ * The address is resolved from the accounts Privy has verified, never taken
+ * from the request. Letting the browser name the destination invited a
+ * mismatch that cannot be resolved safely: a wallet extension reports whatever
+ * account is currently selected, which is often not the one the user
+ * authenticated with, and paying an address Privy has not verified would mean
+ * trusting the client about where money goes.
  */
-export function requireOwnedWallet(user: AuthenticatedUser, wallet: string): string {
-  // Solana addresses are base58 and case-sensitive, so unlike EVM addresses
-  // they must not be lower-cased.
-  const normalized = wallet.trim();
-  if (!isSolanaAddress(normalized)) {
-    throw new AuthError("That does not look like a valid Solana address.");
-  }
-  if (!user.wallets.includes(normalized)) {
-    console.warn(
-      `[auth] wallet mismatch for ${user.privyUserId}: asked to pay ${normalized}, linked = [${user.wallets.join(", ")}]`,
-    );
+export function resolvePayoutWallet(user: AuthenticatedUser): string {
+  const wallet = user.wallets[0];
+  if (!wallet) {
     throw new AuthError(
-      user.wallets.length === 0
-        ? "We couldn't confirm a wallet on your account. Try reconnecting it."
-        : "That wallet is not linked to your account.",
+      "No Solana wallet is linked to your account. Connect or create one, then try again.",
     );
   }
-  return normalized;
+  return wallet;
 }

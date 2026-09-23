@@ -45,6 +45,8 @@ export function VerifyDialog({
   const [requestUrl, setRequestUrl] = useState<string | null>(null);
   const [mode, setMode] = useState<"mock" | "reclaim">("reclaim");
   const [claim, setClaim] = useState<Claim | null>(null);
+  // Where the cashback will actually go, as resolved by the server.
+  const [payoutWallet, setPayoutWallet] = useState<string | null>(null);
   const sessionRef = useRef<string | null>(null);
 
   // Reset whenever a different service is opened.
@@ -54,19 +56,23 @@ export function VerifyDialog({
     setError(null);
     setRequestUrl(null);
     setClaim(null);
+    setPayoutWallet(null);
     sessionRef.current = null;
   }, [serviceId, authenticated, wallet]);
 
   const startVerification = useCallback(async () => {
-    if (!serviceId || !wallet) return;
+    if (!serviceId) return;
     setStage("starting");
     setError(null);
     try {
-      const started = await api<{ sessionId: string; requestUrl: string; mode: "mock" | "reclaim" }>(
-        "/api/verify/start",
-        { method: "POST", body: { serviceId, wallet } },
-      );
+      const started = await api<{
+        sessionId: string;
+        requestUrl: string;
+        mode: "mock" | "reclaim";
+        wallet: string;
+      }>("/api/verify/start", { method: "POST", body: { serviceId } });
       sessionRef.current = started.sessionId;
+      setPayoutWallet(started.wallet);
       setRequestUrl(started.requestUrl);
       setMode(started.mode);
       setStage("awaiting");
@@ -75,7 +81,7 @@ export function VerifyDialog({
       setError(err instanceof Error ? err.message : "Could not start verification.");
       setStage("error");
     }
-  }, [api, serviceId, wallet]);
+  }, [api, serviceId]);
 
   // Poll while the user proves their subscription on their own device.
   useEffect(() => {
@@ -229,7 +235,7 @@ export function VerifyDialog({
           {stage === "eligible" && claim && (
             <Body
               title="You're eligible"
-              text={`${formatUsd(claim.amountCents)} of SOL is ready to send to ${wallet ? `${wallet.slice(0, 4)}…${wallet.slice(-4)}` : "your wallet"}.`}
+              text={`${formatUsd(claim.amountCents)} of SOL is ready to send to ${payoutWallet ? `${payoutWallet.slice(0, 4)}…${payoutWallet.slice(-4)}` : "your linked wallet"}.`}
               action={{ label: `Claim ${formatUsd(claim.amountCents)}`, onClick: claimCashback }}
             />
           )}
