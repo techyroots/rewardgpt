@@ -1,8 +1,7 @@
 import { NextResponse } from "next/server";
-import { prisma } from "@/lib/db";
-import { IneligibleError, recordEligibility } from "@/lib/eligibility";
 import { isServiceId } from "@/lib/services";
 import { getVerifier, VerificationError } from "@/lib/verifiers";
+import { ingestProof } from "@/lib/verify-flow";
 
 export const runtime = "nodejs";
 
@@ -21,43 +20,24 @@ export async function POST(request: Request) {
   }
 
   const payload = await readPayload(request);
-  let sessionId: string | undefined;
 
+  let proof;
   try {
-    const verifier = getVerifier();
-    const proof = await verifier.verify(serviceId, payload);
-    sessionId = proof.sessionId;
-
-    const { claimId, amountCents } = await recordEligibility(serviceId, proof);
-    return NextResponse.json({ ok: true, claimId, amountCents });
+    proof = await getVerifier().verify(serviceId, payload);
   } catch (error) {
-    const rejected = error instanceof IneligibleError;
-    const message = rejected
-      ? error.message
-      : error instanceof VerificationError
-        ? error.message
-        : "Verification failed. Please try again.";
-
-    if (!rejected && !(error instanceof VerificationError)) {
+    const message =
+      error instanceof VerificationError ? error.message : "Verification failed.";
+    if (!(error instanceof VerificationError)) {
       console.error("verify/callback failed", error);
     }
-
-    // Record the outcome so the waiting browser can stop polling and show why.
-    if (sessionId) {
-      await prisma.verificationSession
-        .updateMany({
-          where: { id: sessionId, consumedAt: null },
-          data: {
-            status: rejected ? "REJECTED" : "FAILED",
-            message,
-            consumedAt: new Date(),
-          },
-        })
-        .catch(() => undefined);
-    }
-
-    return NextResponse.json({ error: message }, { status: rejected ? 409 : 400 });
+    return NextResponse.json({ error: message }, { status: 400 });
   }
+
+  const result = await ingestProof(serviceId, proof);
+  if (!result.ok) {
+    return NextResponse.json({ error: result.message }, { status: result.rejected ? 409 : 400 });
+  }
+  return NextResponse.json({ ok: true, claimId: result.claimId, amountCents: result.amountCents });
 }
 
 /** Reclaim may send JSON or a urlencoded `proof` field depending on config. */

@@ -45,7 +45,7 @@ export async function recordEligibility(
     throw new IneligibleError("This proof is timestamped in the future.");
   }
 
-  if (!isPaidPlan(serviceId, proof.plan)) {
+  if (!isPaidPlan(serviceId, proof.plan, proof.status)) {
     throw new IneligibleError(
       "We could not find an active paid subscription on that account.",
     );

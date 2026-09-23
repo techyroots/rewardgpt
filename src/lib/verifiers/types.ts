@@ -18,6 +18,8 @@ export type VerifiedSubscription = {
   accountId: string;
   /** The plan string the provider reported, e.g. "chatgpt-plus". */
   plan: string;
+  /** Subscription status, when the provider reports one separately. */
+  status?: string;
   /** When the attestor signed the claim. */
   issuedAt: Date;
   /** Stable digest of the proof itself, used to reject replays. */
@@ -30,6 +32,12 @@ export interface SubscriptionVerifier {
   start(serviceId: ServiceId): Promise<VerificationStart>;
   /** Validates whatever the verification flow posted back to us. */
   verify(serviceId: ServiceId, payload: unknown): Promise<VerifiedSubscription>;
+  /**
+   * Optionally asks the verification backend whether a proof is ready yet.
+   * Lets the app work without a publicly reachable callback URL, which is
+   * what makes local development possible at all.
+   */
+  poll?(serviceId: ServiceId, sessionId: string): Promise<VerifiedSubscription | null>;
 }
 
 export class VerificationError extends Error {
