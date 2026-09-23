@@ -1,26 +1,73 @@
 @import "tailwindcss";
 
+/*
+ * RewardGPT design tokens.
+ * The mockup is a single light theme, so there is no dark variant here on
+ * purpose — a half-built dark mode reads worse than none.
+ */
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  --background: #fcfcfb;
+  --surface: #ffffff;
+  --foreground: #101010;
+  --muted: #6b7280;
+  --muted-soft: #9ca3af;
+  --border: #e9e8e4;
+  --border-strong: #d8d7d2;
+  --accent: #10a37f;
+  --accent-warm: #d97757;
 }
 
 @theme inline {
   --color-background: var(--background);
+  --color-surface: var(--surface);
   --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
-}
-
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+  --color-muted: var(--muted);
+  --color-muted-soft: var(--muted-soft);
+  --color-line: var(--border);
+  --color-line-strong: var(--border-strong);
+  --color-accent: var(--accent);
+  --color-accent-warm: var(--accent-warm);
+  --font-sans: var(--font-inter);
 }
 
 body {
   background: var(--background);
   color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  font-family: var(--font-inter), ui-sans-serif, system-ui, sans-serif;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* The soft mint/peach wash behind the hero, as in the mockup. */
+.hero-wash {
+  background:
+    radial-gradient(60rem 32rem at 78% -8%, rgba(16, 163, 127, 0.13), transparent 62%),
+    radial-gradient(44rem 26rem at 96% 10%, rgba(217, 119, 87, 0.13), transparent 60%),
+    radial-gradient(40rem 24rem at 50% -14%, rgba(120, 140, 255, 0.07), transparent 60%);
+}
+
+.card-float {
+  box-shadow:
+    0 1px 2px rgba(16, 16, 16, 0.04),
+    0 12px 32px -12px rgba(16, 16, 16, 0.14);
+}
+
+@keyframes rise {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+.rise {
+  animation: rise 0.5s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .rise {
+    animation: none;
+  }
 }

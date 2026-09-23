@@ -1,0 +1,71 @@
+// RewardGPT data model.
+//
+// Privacy note: we never persist the raw account identifier that comes back
+// inside a zkTLS proof. It is HMAC'd into `Claim.nullifier` in the same request
+// and then discarded. The nullifier is what stops one subscription from
+// claiming cashback through several wallets.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model Service {
+  id            String  @id // "chatgpt" | "claude" | "grok"
+  name          String
+  planLabel     String // e.g. "ChatGPT Plus"
+  priceUsdCents Int // monthly subscription price we pay cashback on
+  cashbackBps   Int     @default(500) // 500 bps = 5%
+  enabled       Boolean @default(true)
+
+  claims Claim[]
+}
+
+model Claim {
+  id          String  @id @default(cuid())
+  privyUserId String
+  wallet      String
+  serviceId   String
+  service     Service @relation(fields: [serviceId], references: [id])
+
+  // Anonymous, per-subscription identity. Unique across the whole table.
+  nullifier String @unique
+  // Guards against the same proof being submitted twice.
+  proofHash String @unique
+
+  status      String @default("ELIGIBLE") // ELIGIBLE | PAYING | PAID | REVIEW
+  amountCents Int
+  txHash      String?
+  failure     String?
+
+  createdAt DateTime  @default(now())
+  paidAt    DateTime?
+
+  @@index([wallet, serviceId])
+  @@index([privyUserId])
+}
+
+// One row per issued verification session, so a proof can only be redeemed by
+// the wallet that started the flow.
+model VerificationSession {
+  id          String @id // Reclaim session id
+  privyUserId String
+  wallet      String
+  serviceId   String
+
+  // PENDING while the user is still proving, then SUCCESS / REJECTED / FAILED.
+  status  String  @default("PENDING")
+  // Human-readable reason shown in the UI when status is not SUCCESS.
+  message String?
+  // Set once the proof produced an eligible claim.
+  claimId String?
+
+  createdAt  DateTime  @default(now())
+  consumedAt DateTime?
+
+  @@index([privyUserId])
+}
