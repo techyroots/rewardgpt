@@ -53,19 +53,16 @@ export const env = {
     return required(`RECLAIM_PROVIDER_${serviceId.toUpperCase()}`);
   },
 
-  get treasuryPrivateKey(): `0x${string}` {
-    const key = required("TREASURY_PRIVATE_KEY");
-    if (!/^0x[0-9a-fA-F]{64}$/.test(key)) {
-      throw new Error("TREASURY_PRIVATE_KEY must be a 0x-prefixed 32-byte hex string.");
-    }
-    return key as `0x${string}`;
+  /** Base58 secret key, or the JSON byte array the Solana CLI writes. */
+  get treasurySecretKey(): string {
+    return required("TREASURY_SECRET_KEY");
   },
-  get rpcUrl(): string | undefined {
-    return process.env.RPC_URL;
+  get solanaRpcUrl(): string | undefined {
+    return process.env.SOLANA_RPC_URL;
   },
-  /** Base mainnet unless explicitly told otherwise. */
-  get useTestnet(): boolean {
-    return process.env.CHAIN === "base-sepolia";
+  /** devnet unless explicitly pointed at mainnet. */
+  get solanaCluster(): "devnet" | "mainnet-beta" {
+    return process.env.SOLANA_CLUSTER === "mainnet-beta" ? "mainnet-beta" : "devnet";
   },
 
   /** Hard ceiling on what the treasury can pay out in a rolling 24h, in cents. */

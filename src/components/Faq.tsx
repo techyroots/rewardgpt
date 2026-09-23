@@ -12,12 +12,16 @@ const FAQS = [
     a: "Briefly, yes — and we would rather be straight about it. The ChatGPT proof identifies your account by email address. It arrives inside the proof, is immediately turned into an irreversible hash, and the address itself is never written to our database or our logs. It is what stops one subscription claiming twice. We cannot read it back, but it does pass through our server, so this is not zero-knowledge from our side.",
   },
   {
+    q: "Why does the SOL amount change?",
+    a: "Cashback is 5% of what you pay for your subscription, which is priced in dollars. We convert that to SOL at the moment you claim and record the rate we used, so you always receive 5% of your subscription price in value.",
+  },
+  {
     q: "Can I claim from several wallets?",
     a: "No. Each subscription produces one anonymous identifier, and that identifier can only ever be used once. A second wallet proving the same subscription is rejected.",
   },
   {
     q: "How do I get paid?",
-    a: "In USDC on Base, sent from our treasury directly to your wallet. You pay no gas and sign nothing.",
+    a: "In SOL, sent from our treasury directly to your Solana wallet. You pay no network fee and sign nothing.",
   },
   {
     q: "How often can I claim?",

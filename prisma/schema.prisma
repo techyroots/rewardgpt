@@ -41,7 +41,14 @@ model Claim {
   // Which tier this payout was priced from, e.g. "ChatGPT Pro". Kept so a
   // payout amount can always be explained after the fact.
   planLabel   String?
+  // What we owe, in USD cents. The SOL amount is derived from this at payout
+  // time, because the cashback percentage is defined against the subscription
+  // price in dollars.
   amountCents Int
+  // What was actually sent, and the SOL/USD rate it was quoted at, so any
+  // payout can be explained after the fact.
+  lamports    String?
+  solUsdRate  Float?
   txHash      String?
   failure     String?
 

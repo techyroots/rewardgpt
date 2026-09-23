@@ -1,8 +1,8 @@
 # RewardGPT
 
-5% cashback on paid AI subscriptions. A user connects a wallet, privately proves
-they have an active ChatGPT, Claude or Grok plan using zkTLS, and receives USDC
-from a single treasury wallet.
+5% cashback on paid AI subscriptions. A user connects a Solana wallet, privately
+proves they have an active ChatGPT, Claude or Grok plan using zkTLS, and
+receives SOL from a single treasury wallet.
 
 No credentials are ever entered into this app. The proof happens on the user's
 own device, against the real provider's website.
@@ -40,7 +40,7 @@ user proves on their own device (Reclaim)  ──signed proof──▶ /api/veri
                                                              │
 browser polls /api/verify/status ──────────────────────▶ /api/claim
                                                              │
-                                              treasury wallet sends USDC
+                                              treasury wallet sends SOL
 ```
 
 | Area | File |
@@ -50,6 +50,7 @@ browser polls /api/verify/status ───────────────�
 | Which plans count as paid | `src/lib/verifiers/plans.ts` |
 | Verification backends | `src/lib/verifiers/` |
 | Treasury payout | `src/lib/payout.ts` |
+| USD -> SOL conversion | `src/lib/sol-price.ts` |
 | Prices and cashback rates | `Service` table, seeded from `src/lib/services.ts` |
 
 ## Privacy
@@ -74,7 +75,8 @@ eligible again, so treat it as permanent.
 - **Freshness** — proofs older than `PROOF_MAX_AGE_MINUTES` are rejected.
 - **Cooldown** — `CLAIM_COOLDOWN_DAYS` per wallet per service.
 - **Daily cap** — `DAILY_PAYOUT_CAP_USD` bounds the damage if eligibility logic is ever wrong.
-- **Amounts** — always read from the database, never from the request body.
+- **Amounts** — the USD figure is always read from the database, never from the request body.
+- **Price sanity** — a SOL/USD rate outside $1–$10,000 is treated as a broken feed and refuses to pay.
 
 ## Setting up real verification
 
@@ -107,13 +109,25 @@ fixed, so it is worth alerting on callback failure rates.
 ## Going to production
 
 1. Switch `datasource db` in `prisma/schema.prisma` to `postgresql` and point `DATABASE_URL` at it.
-2. Set `CHAIN=base` and `NEXT_PUBLIC_CHAIN=base`, and fund the treasury with USDC.
-3. Move `TREASURY_PRIVATE_KEY` into a secrets manager. It is a hot wallet — keep only the float you need in it.
+2. Set `SOLANA_CLUSTER=mainnet-beta`, point `SOLANA_RPC_URL` at a paid RPC provider (the public endpoint is rate limited), and fund the treasury with SOL.
+3. Move `TREASURY_SECRET_KEY` into a secrets manager. It is a hot wallet — keep only the float you need in it.
 4. Set `VERIFIER_MODE=reclaim`. The mock verifier refuses to start in production.
 5. Watch for claims in `REVIEW` status: those were broadcast but not confirmed, and need settling against the chain by hand.
 
+## Paying in SOL
+
+Cashback is defined as 5% of a subscription price in **dollars**, but paid in
+**SOL**. The conversion happens at claim time against a live rate (CoinGecko,
+with Binance behind it), and the rate used is stored on the claim so any payout
+can be explained later.
+
+This means the SOL amount for the same plan varies between claims. That is the
+correct behaviour — the alternative, a fixed SOL amount per tier, silently
+stops being 5% the moment the price moves.
+
 ## Known limitations
 
-- Payouts are pushed by the backend rather than claimed from a contract. Users pay no gas and sign nothing, but they are trusting the operator. An on-chain vault with EIP-712 vouchers can replace `src/lib/payout.ts` without touching the frontend.
+- Payouts are pushed by the backend rather than claimed from a program. Users pay no fee and sign nothing, but they are trusting the operator.
+- SOL is volatile. Between the moment a user sees the amount and the moment it lands, the value can move; between claiming and selling, more so.
 - Verifying subscriptions through private endpoints sits in a grey area with each provider's terms, and running a cashback programme funded from one wallet may carry money-transmission obligations depending on where you operate. Worth legal review before real money moves.
 - The service marks in `src/components/logos.tsx` are geometric stand-ins, not the official brand logos.

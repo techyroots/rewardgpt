@@ -1,5 +1,6 @@
 import { PrivyClient } from "@privy-io/server-auth";
 import { env } from "./env";
+import { isSolanaAddress } from "./solana";
 
 /**
  * Privy replaces the usual SIWE nonce/session dance: the browser already holds
@@ -84,13 +85,12 @@ export async function authenticate(request: Request): Promise<AuthenticatedUser>
   return { privyUserId, wallets };
 }
 
-/** Linked wallet addresses, lower-cased. Embedded and external both count. */
+/** Linked Solana wallet addresses. Embedded and external both count. */
 function walletsOf(user: { linkedAccounts: { type: string }[] }): string[] {
   return user.linkedAccounts
     .filter((account) => account.type === "wallet" || account.type === "smart_wallet")
-    .map((account) => (account as unknown as { address: string }).address)
-    .filter(Boolean)
-    .map((address) => address.toLowerCase());
+    .map((account) => (account as unknown as { address?: string }).address)
+    .filter((address): address is string => Boolean(address) && isSolanaAddress(address!));
 }
 
 /**
@@ -98,9 +98,11 @@ function walletsOf(user: { linkedAccounts: { type: string }[] }): string[] {
  * can't be pointed at someone else's wallet by editing the request body.
  */
 export function requireOwnedWallet(user: AuthenticatedUser, wallet: string): string {
-  const normalized = wallet.trim().toLowerCase();
-  if (!/^0x[0-9a-f]{40}$/.test(normalized)) {
-    throw new AuthError("That does not look like a valid wallet address.");
+  // Solana addresses are base58 and case-sensitive, so unlike EVM addresses
+  // they must not be lower-cased.
+  const normalized = wallet.trim();
+  if (!isSolanaAddress(normalized)) {
+    throw new AuthError("That does not look like a valid Solana address.");
   }
   if (!user.wallets.includes(normalized)) {
     console.warn(

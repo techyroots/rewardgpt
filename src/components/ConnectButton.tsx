@@ -1,14 +1,18 @@
 "use client";
 
-import { usePrivy, useWallets } from "@privy-io/react-auth";
+import { usePrivy } from "@privy-io/react-auth";
+import { useWallets } from "@privy-io/react-auth/solana";
 import { PRIVY_ENABLED } from "@/lib/privy-enabled";
 import { SetupNotice } from "./SetupNotice";
 
 export function shortenAddress(address: string): string {
-  return `${address.slice(0, 6)}…${address.slice(-4)}`;
+  return `${address.slice(0, 4)}…${address.slice(-4)}`;
 }
 
-/** Returns the wallet cashback should be sent to, or null if there isn't one yet. */
+/**
+ * The Solana wallet cashback should be sent to, or null if there isn't one.
+ * Cashback is paid in SOL, so an EVM wallet is of no use here.
+ */
 export function usePayoutWallet(): string | null {
   const { wallets } = useWallets();
   return wallets[0]?.address ?? null;

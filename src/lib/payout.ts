@@ -1,7 +1,14 @@
-import type { Address } from "viem";
-import { centsToUsdcUnits, ERC20_ABI, publicClient, treasury, usdcAddress } from "./chain";
+import {
+  LAMPORTS_PER_SOL as WEB3_LAMPORTS,
+  PublicKey,
+  SystemProgram,
+  Transaction,
+  sendAndConfirmTransaction,
+} from "@solana/web3.js";
 import { prisma } from "./db";
 import { env } from "./env";
+import { quoteLamports } from "./sol-price";
+import { connection, treasury } from "./solana";
 
 export class PayoutError extends Error {
   constructor(message: string) {
@@ -11,25 +18,28 @@ export class PayoutError extends Error {
 }
 
 /**
- * Pays a single claim from the treasury wallet.
+ * Pays a single claim in SOL from the treasury wallet.
  *
- * The user pays no gas and signs nothing — they only ever prove eligibility.
- * Safety comes from three places:
+ * The user pays no fee and signs nothing — they only ever prove eligibility.
+ * Safety comes from four places:
  *  1. the ELIGIBLE -> PAYING flip is a conditional update, so two concurrent
  *     claim requests cannot both begin a transfer,
- *  2. the amount is read from the database, never from the request,
- *  3. a rolling 24h cap and a balance check bound the blast radius if
- *     eligibility logic is ever wrong.
+ *  2. the USD amount is read from the database, never from the request,
+ *  3. the SOL amount is quoted at payout time and recorded with its rate,
+ *  4. a rolling 24h cap and a balance check bound the blast radius.
  */
-export async function payClaim(claimId: string): Promise<{ txHash: string }> {
+export async function payClaim(claimId: string): Promise<{ signature: string }> {
   const claim = await prisma.claim.findUnique({ where: { id: claimId } });
   if (!claim) throw new PayoutError("Claim not found.");
-  if (claim.status === "PAID" && claim.txHash) return { txHash: claim.txHash };
+  if (claim.status === "PAID" && claim.txHash) return { signature: claim.txHash };
   if (claim.status !== "ELIGIBLE") {
     throw new PayoutError(`Claim is ${claim.status.toLowerCase()}, not ready to pay.`);
   }
 
   await assertWithinDailyCap(claim.amountCents);
+
+  // Quote before locking, so a price-feed outage doesn't strand the claim.
+  const { lamports, solUsdRate } = await quoteLamports(claim.amountCents);
 
   // Conditional update doubles as a lock: whoever flips ELIGIBLE -> PAYING
   // first owns the transfer, and the loser's updateMany touches zero rows.
@@ -41,62 +51,69 @@ export async function payClaim(claimId: string): Promise<{ txHash: string }> {
     throw new PayoutError("This claim is already being paid.");
   }
 
-  // Tracked outside the try so the recovery path can tell "never sent" from
-  // "sent but we lost track of it".
-  let submittedTx: string | undefined;
+  let submitted: string | undefined;
 
   try {
-    const amount = centsToUsdcUnits(claim.amountCents);
-    const { account, wallet } = treasury();
-    const client = publicClient();
+    const payer = treasury();
+    const rpc = connection();
 
-    const balance = await client.readContract({
-      address: usdcAddress(),
-      abi: ERC20_ABI,
-      functionName: "balanceOf",
-      args: [account.address],
-    });
-    if (balance < amount) {
-      throw new PayoutError("Treasury is out of USDC. Please try again later.");
+    let recipient: PublicKey;
+    try {
+      recipient = new PublicKey(claim.wallet);
+    } catch {
+      throw new PayoutError("That wallet is not a valid Solana address.");
     }
 
-    const txHash = await wallet.writeContract({
-      address: usdcAddress(),
-      abi: ERC20_ABI,
-      functionName: "transfer",
-      args: [claim.wallet as Address, amount],
-    });
-    submittedTx = txHash;
-
-    // Wait for inclusion so a reverted transfer is never reported as paid.
-    const receipt = await client.waitForTransactionReceipt({ hash: txHash });
-    if (receipt.status !== "success") {
-      throw new PayoutError("The payout transaction reverted on chain.");
+    // Keep enough behind to stay rent-exempt and cover the fee.
+    const balance = BigInt(await rpc.getBalance(payer.publicKey));
+    const reserve = BigInt(Math.round(0.002 * WEB3_LAMPORTS));
+    if (balance < lamports + reserve) {
+      throw new PayoutError("Treasury is out of SOL. Please try again later.");
     }
+
+    const transaction = new Transaction().add(
+      SystemProgram.transfer({
+        fromPubkey: payer.publicKey,
+        toPubkey: recipient,
+        lamports: Number(lamports),
+      }),
+    );
+
+    // sendAndConfirmTransaction waits for confirmation, so a dropped or failed
+    // transaction is never reported as paid.
+    const signature = await sendAndConfirmTransaction(rpc, transaction, [payer], {
+      commitment: "confirmed",
+    });
+    submitted = signature;
 
     await prisma.claim.update({
       where: { id: claimId },
-      data: { status: "PAID", txHash, paidAt: new Date(), failure: null },
+      data: {
+        status: "PAID",
+        txHash: signature,
+        lamports: lamports.toString(),
+        solUsdRate,
+        paidAt: new Date(),
+        failure: null,
+      },
     });
 
-    return { txHash };
+    return { signature };
   } catch (error) {
     const reason = error instanceof Error ? error.message.slice(0, 500) : "Unknown payout error";
 
-    if (submittedTx) {
-      // The transfer was broadcast and we lost track of it — a timed-out
-      // receipt poll, say. Returning this to ELIGIBLE would risk paying twice,
-      // so it parks in REVIEW for a human to settle against the chain.
+    if (submitted) {
+      // Broadcast but not recorded. Returning this to ELIGIBLE would risk
+      // paying twice, so it parks in REVIEW for a human to settle on chain.
       await prisma.claim.update({
         where: { id: claimId },
-        data: { status: "REVIEW", txHash: submittedTx, failure: reason },
+        data: { status: "REVIEW", txHash: submitted, failure: reason },
       });
       throw new PayoutError(
-        "Your payout was sent but we could not confirm it. We're checking — you will not be charged or paid twice.",
+        "Your payout was sent but we could not confirm it. We're checking — you will not be paid twice.",
       );
     }
 
-    // Nothing was broadcast, so it is safe to let the user try again.
     await prisma.claim.update({
       where: { id: claimId },
       data: { status: "ELIGIBLE", failure: reason },
@@ -121,17 +138,10 @@ async function assertWithinDailyCap(pendingCents: number): Promise<void> {
   }
 }
 
-/** Live treasury balance in cents, for the stats strip. */
-export async function treasuryBalanceCents(): Promise<number | null> {
+/** Live treasury balance in lamports, for the stats strip. */
+export async function treasuryLamports(): Promise<bigint | null> {
   try {
-    const { account } = treasury();
-    const balance = await publicClient().readContract({
-      address: usdcAddress(),
-      abi: ERC20_ABI,
-      functionName: "balanceOf",
-      args: [account.address],
-    });
-    return Number(balance / 10n ** 4n);
+    return BigInt(await connection().getBalance(treasury().publicKey));
   } catch {
     // No treasury configured yet (or RPC down) — the UI hides the figure.
     return null;

@@ -1,5 +1,5 @@
 import { prisma } from "@/lib/db";
-import { treasuryBalanceCents } from "@/lib/payout";
+import { treasuryLamports } from "@/lib/payout";
 import { formatUsd } from "@/lib/services";
 
 /**
@@ -13,17 +13,17 @@ export async function StatsBar() {
   const startOfDay = new Date();
   startOfDay.setHours(0, 0, 0, 0);
 
-  const [paid, distinctUsers, claimsToday, treasuryCents] = await Promise.all([
+  const [paid, distinctUsers, claimsToday, lamports] = await Promise.all([
     prisma.claim.aggregate({ _sum: { amountCents: true }, where: { status: "PAID" } }),
     prisma.claim.findMany({ distinct: ["privyUserId"], select: { privyUserId: true } }),
     prisma.claim.count({ where: { createdAt: { gte: startOfDay } } }),
-    treasuryBalanceCents(),
+    treasuryLamports(),
   ]);
 
   const tiles = [
-    treasuryCents !== null && {
+    lamports !== null && {
       label: "Treasury Balance",
-      value: formatUsd(treasuryCents),
+      value: `${(Number(lamports) / 1_000_000_000).toFixed(3)} SOL`,
       icon: <DatabaseIcon />,
     },
     {

@@ -1,6 +1,7 @@
 "use client";
 
-import { useCreateWallet, usePrivy } from "@privy-io/react-auth";
+import { usePrivy } from "@privy-io/react-auth";
+import { useCreateWallet } from "@privy-io/react-auth/solana";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useApi } from "@/lib/client-api";
 import { formatUsd, getServiceDefinition, type ServiceId } from "@/lib/services";
@@ -14,6 +15,9 @@ type Claim = {
   amountCents: number;
   status: string;
   txHash: string | null;
+  /** Set once paid: the SOL actually sent, and where to view the transaction. */
+  solAmount?: string | null;
+  explorerUrl?: string | null;
 };
 
 type StatusResponse = {
@@ -107,11 +111,17 @@ export function VerifyDialog({
     setStage("claiming");
     setError(null);
     try {
-      const result = await api<{ txHash: string }>("/api/claim", {
-        method: "POST",
-        body: { claimId: claim.id },
+      const result = await api<{ signature: string; solAmount: string; explorerUrl: string }>(
+        "/api/claim",
+        { method: "POST", body: { claimId: claim.id } },
+      );
+      setClaim({
+        ...claim,
+        status: "PAID",
+        txHash: result.signature,
+        solAmount: result.solAmount,
+        explorerUrl: result.explorerUrl,
       });
-      setClaim({ ...claim, status: "PAID", txHash: result.txHash });
       setStage("paid");
     } catch (err) {
       setError(err instanceof Error ? err.message : "Could not send your cashback.");
@@ -219,7 +229,7 @@ export function VerifyDialog({
           {stage === "eligible" && claim && (
             <Body
               title="You're eligible"
-              text={`${formatUsd(claim.amountCents)} USDC is ready to send to ${wallet ? `${wallet.slice(0, 6)}…${wallet.slice(-4)}` : "your wallet"}.`}
+              text={`${formatUsd(claim.amountCents)} of SOL is ready to send to ${wallet ? `${wallet.slice(0, 4)}…${wallet.slice(-4)}` : "your wallet"}.`}
               action={{ label: `Claim ${formatUsd(claim.amountCents)}`, onClick: claimCashback }}
             />
           )}
@@ -227,10 +237,13 @@ export function VerifyDialog({
           {stage === "claiming" && <Body title="Sending…" text="Your cashback is on its way. This takes a few seconds." />}
 
           {stage === "paid" && claim && (
-            <Body title="Cashback sent" text={`${formatUsd(claim.amountCents)} USDC is on its way to your wallet.`}>
+            <Body
+              title="Cashback sent"
+              text={`${claim.solAmount ? `${claim.solAmount} SOL` : formatUsd(claim.amountCents)} is on its way to your wallet.`}
+            >
               {claim.txHash && (
                 <a
-                  href={`https://basescan.org/tx/${claim.txHash}`}
+                  href={claim.explorerUrl ?? "#"}
                   target="_blank"
                   rel="noopener noreferrer"
                   className="text-sm font-medium text-accent underline underline-offset-4"
