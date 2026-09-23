@@ -51,20 +51,46 @@ export async function authenticate(request: Request): Promise<AuthenticatedUser>
 
   const idToken = request.headers.get("privy-id-token") ?? undefined;
   let wallets: string[] = [];
+  let source = "none";
+
+  // Preferred path: the identity token carries linked accounts with no API call.
   if (idToken) {
     try {
-      const user = await privy().getUser({ idToken });
-      wallets = user.linkedAccounts
-        .filter((account) => account.type === "wallet")
-        .map((account) => (account as { address: string }).address.toLowerCase());
+      wallets = walletsOf(await privy().getUser({ idToken }));
+      source = "identity-token";
     } catch {
-      // Fall through: an unusable identity token just means we can't confirm
-      // wallet ownership from it, which `requireOwnedWallet` treats as failure.
       wallets = [];
     }
   }
 
+  // Fallback: ask Privy directly. This is rate limited, so it only runs when
+  // the identity token is absent or unusable — which is the case whenever
+  // identity tokens are not enabled for the app.
+  if (wallets.length === 0) {
+    try {
+      wallets = walletsOf(await privy().getUser(privyUserId));
+      source = "user-lookup";
+    } catch (error) {
+      console.error("Could not load linked accounts for", privyUserId, error);
+    }
+  }
+
+  if (wallets.length === 0) {
+    console.warn(
+      `[auth] no linked wallets for ${privyUserId} (idToken ${idToken ? "present" : "absent"}, source ${source})`,
+    );
+  }
+
   return { privyUserId, wallets };
+}
+
+/** Linked wallet addresses, lower-cased. Embedded and external both count. */
+function walletsOf(user: { linkedAccounts: { type: string }[] }): string[] {
+  return user.linkedAccounts
+    .filter((account) => account.type === "wallet" || account.type === "smart_wallet")
+    .map((account) => (account as unknown as { address: string }).address)
+    .filter(Boolean)
+    .map((address) => address.toLowerCase());
 }
 
 /**
@@ -77,7 +103,14 @@ export function requireOwnedWallet(user: AuthenticatedUser, wallet: string): str
     throw new AuthError("That does not look like a valid wallet address.");
   }
   if (!user.wallets.includes(normalized)) {
-    throw new AuthError("That wallet is not linked to your account.");
+    console.warn(
+      `[auth] wallet mismatch for ${user.privyUserId}: asked to pay ${normalized}, linked = [${user.wallets.join(", ")}]`,
+    );
+    throw new AuthError(
+      user.wallets.length === 0
+        ? "We couldn't confirm a wallet on your account. Try reconnecting it."
+        : "That wallet is not linked to your account.",
+    );
   }
   return normalized;
 }
