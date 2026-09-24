@@ -47,6 +47,8 @@ Set these in **Vercel → Project → Settings → Environment Variables**, or w
 | `RECLAIM_APP_SECRET` | from dev.reclaimprotocol.org |
 | `RECLAIM_PROVIDER_CHATGPT` | the ChatGPT provider id |
 | `RECLAIM_PROVIDER_HASH_CHATGPT` | the pinned provider hash |
+| `RECLAIM_PROVIDER_CLAUDE` | the Claude provider id |
+| `RECLAIM_PROVIDER_HASH_CLAUDE` | the pinned hash, printed by the first local proof |
 | `NULLIFIER_PEPPER` | `openssl rand -hex 32` — permanent, see below |
 | `TREASURY_SECRET_KEY` | base58 secret key of the paying wallet |
 | `SOLANA_CLUSTER` | `devnet` for a demo, `mainnet-beta` for real money |

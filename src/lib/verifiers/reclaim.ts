@@ -1,3 +1,4 @@
+import { createHash } from "node:crypto";
 import { fetchStatusUrl, ReclaimProofRequest, verifyProof, type Proof } from "@reclaimprotocol/js-sdk";
 import { env } from "../env";
 import type { ServiceId } from "../services";
@@ -33,12 +34,13 @@ const EXPECTED_HOSTS: Record<ServiceId, string[]> = {
 
 /** Checked in order; first non-empty match wins. */
 const ACCOUNT_ID_ALIASES = [
-  "accountId", "account_id", "userId", "user_id", "uid", "id", "sub", "email",
+  "accountId", "account_id", "userId", "user_id", "orgId", "org_id", "uuid", "uid", "id", "sub", "email",
 ];
 const PLAN_ALIASES = [
   "plan", "planType", "plan_type", "accountPlan", "membershipTier",
   "memberShipTier", "membership_tier", "tier", "subscription",
-  "subscriptionPlan", "subscription_plan", "planName",
+  "subscriptionPlan", "subscription_plan", "subscription_tier", "subscriptionTier",
+  "rate_limit_tier", "rateLimitTier", "planName",
 ];
 const STATUS_ALIASES = ["status", "subscriptionStatus", "subscription_status", "state", "isActive"];
 
@@ -145,9 +147,15 @@ export class ReclaimVerifier implements SubscriptionVerifier {
     // Step 2: the proof must come from the provider we asked for. Pinning the
     // hash is what stops a proof generated against some other, weaker provider
     // from being passed off as this one.
+    //
+    // Proofs from AI-built providers carry no provider hash, so for those we
+    // pin a digest of the signed request shape instead: the URL, method and
+    // the match and redaction rules. That is the part a weaker provider would
+    // have to differ in, and it is covered by the attestor signatures.
+    const observedHash = context.providerHash ?? requestShapeHash(proof);
     const pinnedHash = process.env[`RECLAIM_PROVIDER_HASH_${serviceId.toUpperCase()}`];
     if (pinnedHash) {
-      if (context.providerHash?.toLowerCase() !== pinnedHash.toLowerCase()) {
+      if (observedHash.toLowerCase() !== pinnedHash.toLowerCase()) {
         throw new VerificationError("This proof was produced by a different provider.");
       }
     } else if (process.env.NODE_ENV === "production") {
@@ -156,7 +164,7 @@ export class ReclaimVerifier implements SubscriptionVerifier {
       );
     } else {
       console.warn(
-        `[reclaim] ${serviceId}: no pinned provider hash. Observed ${context.providerHash}. Set RECLAIM_PROVIDER_HASH_${serviceId.toUpperCase()} to lock it.`,
+        `[reclaim] ${serviceId}: no pinned provider hash. Observed ${observedHash}. Set RECLAIM_PROVIDER_HASH_${serviceId.toUpperCase()} to lock it.`,
       );
     }
 
@@ -177,7 +185,9 @@ export class ReclaimVerifier implements SubscriptionVerifier {
     const plan = pick(params, PLAN_ALIASES, process.env.RECLAIM_PARAM_PLAN);
     const status = pick(params, STATUS_ALIASES, process.env.RECLAIM_PARAM_STATUS);
 
-    if (!accountId || !plan) {
+    // A provider may prove the subscription status without the plan name;
+    // resolvePlanTier then prices it at the cheapest tier.
+    if (!accountId || (!plan && !status)) {
       // Log the keys (not the values) so the right alias can be added without
       // a second round trip through a real verification.
       console.error(
@@ -200,7 +210,7 @@ export class ReclaimVerifier implements SubscriptionVerifier {
     return {
       sessionId,
       accountId,
-      plan,
+      plan: plan ?? "",
       status,
       // timestampS is when the attestor signed; it is what freshness is judged on.
       issuedAt: new Date(proof.claimData.timestampS * 1000),
@@ -226,6 +236,24 @@ function parseContext(proof: Proof): ProofContext {
   } catch {
     throw new VerificationError("Proof context could not be read.");
   }
+}
+
+/** Digest of the signed request a proof covers, for providers that report no hash. */
+function requestShapeHash(proof: Proof): string {
+  let params: Record<string, unknown>;
+  try {
+    params = JSON.parse(String(proof.claimData.parameters ?? "{}"));
+  } catch {
+    throw new VerificationError("Proof parameters could not be read.");
+  }
+  const shape = {
+    provider: proof.claimData.provider,
+    url: params.url,
+    method: params.method,
+    responseMatches: params.responseMatches,
+    responseRedactions: params.responseRedactions,
+  };
+  return createHash("sha256").update(JSON.stringify(shape)).digest("hex");
 }
 
 /** Refuses a proof whose underlying request did not target the service. */

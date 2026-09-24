@@ -31,6 +31,9 @@ export const PLAN_TIERS: Record<ServiceId, PlanTier[]> = {
     { match: /\bgo\b/i, label: "ChatGPT Go", priceUsdCents: 500 },
   ],
   claude: [
+    // claude.ai reports the tier as rate_limit_tier, e.g. "default_claude_max_20x".
+    // Max comes in two sizes at two prices, so the 20x pattern must come first.
+    { match: /max\s*-?_?20x/i, label: "Claude Max 20x", priceUsdCents: 20000 },
     { match: /claude\s*-?_?max|^max/i, label: "Claude Max", priceUsdCents: 10000 },
     { match: /claude\s*-?_?pro|^pro$|default_pro/i, label: "Claude Pro", priceUsdCents: 2000 },
   ],
@@ -57,7 +60,15 @@ export function resolvePlanTier(
   status?: string,
 ): PlanTier | null {
   const normalized = plan.trim();
-  if (!normalized) return null;
+  if (!normalized) {
+    // Some providers prove only that a subscription is active, not which plan
+    // it is on. Assume the cheapest paid tier then, so a missing plan can only
+    // ever under-pay. Only an exact "active" counts; anything else is refused.
+    if (status?.trim().toLowerCase() !== "active") return null;
+    return PLAN_TIERS[serviceId].reduce((cheapest, tier) =>
+      tier.priceUsdCents < cheapest.priceUsdCents ? tier : cheapest,
+    );
+  }
 
   const haystack = `${normalized} ${status ?? ""}`;
   if (INACTIVE_PATTERNS.some((pattern) => pattern.test(haystack))) return null;

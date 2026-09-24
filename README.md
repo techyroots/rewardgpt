@@ -107,7 +107,7 @@ Suggested endpoints to build the providers against:
 | Service | Endpoint |
 | --- | --- |
 | ChatGPT | `GET https://chatgpt.com/backend-api/me` |
-| Claude | `GET https://claude.ai/api/organizations` |
+| Claude | `GET https://claude.ai/api/organizations/{orgId}` — `uuid` as `orgId`, `analytics_subscription_plan` as `plan` |
 | Grok | `GET https://grok.com/rest/subscriptions` |
 
 These are private, undocumented APIs. Expect their shapes to change without
