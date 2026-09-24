@@ -1,0 +1,4 @@
+# The Vercel CLI uploads the working directory; keep local secrets out of it.
+# Production values come from the Vercel project settings.
+.env*
+!.env.example
